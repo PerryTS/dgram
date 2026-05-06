@@ -58,9 +58,16 @@ jobs:
           # an `[ -f literal-pattern ]` that fails under `set -e`.
           shopt -s nullglob
           mkdir -p artifact/${{ matrix.target }}
-          # macOS / Linux pattern: lib<name>.a; Windows pattern: <name>.lib
+          # Rename to embed the target triple — without this, every
+          # leg's `libperry_ext_dgram.a` collides on the release, and
+          # softprops' overwrite-by-default leaves only one .a in the
+          # uploaded asset list.
           for f in target/${{ matrix.target }}/release/*.a target/${{ matrix.target }}/release/*.lib; do
-            cp "$f" artifact/${{ matrix.target }}/
+            base="$(basename "$f")"
+            # libfoo.a → libfoo-<target>.a; foo.lib → foo-<target>.lib
+            stem="${base%.*}"
+            ext="${base##*.}"
+            cp "$f" "artifact/${{ matrix.target }}/${stem}-${{ matrix.target }}.${ext}"
           done
       - uses: actions/upload-artifact@v4
         with:
