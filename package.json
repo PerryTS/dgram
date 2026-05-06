@@ -1,0 +1,99 @@
+{
+  "name": "dgram",
+  "version": "0.1.0",
+  "description": "UDP datagram socket bindings (Node `dgram` module) for the Perry TypeScript-to-native compiler.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryTS/dgram.git"
+  },
+  "homepage": "https://github.com/PerryTS/dgram#readme",
+  "bugs": {
+    "url": "https://github.com/PerryTS/perry/issues"
+  },
+  "keywords": [
+    "perry",
+    "perryts",
+    "dgram",
+    "udp",
+    "networking"
+  ],
+  "types": "src/index.d.ts",
+  "files": [
+    "src/",
+    "Cargo.toml",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "perry": {
+    "nativeLibrary": {
+      "abiVersion": "0.5",
+      "functions": [
+        {
+          "name": "js_dgram_create_socket",
+          "params": ["string"],
+          "returns": "i64"
+        },
+        {
+          "name": "js_dgram_bind",
+          "params": ["i64", "f64", "string"],
+          "returns": "promise"
+        },
+        {
+          "name": "js_dgram_send",
+          "params": ["i64", "string", "f64", "string"],
+          "returns": "promise"
+        },
+        {
+          "name": "js_dgram_send_buffer",
+          "params": ["i64", "ptr", "f64", "string"],
+          "returns": "promise"
+        },
+        {
+          "name": "js_dgram_recv",
+          "params": ["i64", "f64"],
+          "returns": "promise"
+        },
+        {
+          "name": "js_dgram_close",
+          "params": ["i64"],
+          "returns": "promise"
+        },
+        {
+          "name": "js_dgram_address",
+          "params": ["i64"],
+          "returns": "f64"
+        },
+        {
+          "name": "js_dgram_set_broadcast",
+          "params": ["i64", "f64"],
+          "returns": "i64"
+        },
+        {
+          "name": "js_dgram_add_membership",
+          "params": ["i64", "string", "string"],
+          "returns": "i64"
+        },
+        {
+          "name": "js_dgram_drop_membership",
+          "params": ["i64", "string", "string"],
+          "returns": "i64"
+        }
+      ],
+      "targets": {
+        "macos": {
+          "cargo_features": [],
+          "frameworks": []
+        },
+        "linux": {
+          "cargo_features": []
+        },
+        "windows": {
+          "cargo_features": []
+        }
+      }
+    }
+  }
+}
