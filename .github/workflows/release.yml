@@ -14,6 +14,11 @@ jobs:
   build:
     name: ${{ matrix.target }}
     strategy:
+      # One target's failure shouldn't cancel the others — without this,
+      # a missing aarch64 cross-toolchain on ubuntu-latest cascades into
+      # cancellation of the macOS + Windows legs that would otherwise
+      # succeed.
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-apple-darwin
@@ -32,7 +37,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: cargo build --release --target ${{ matrix.target }}
+      # mimalloc-sys (transitive via perry-runtime) compiles its C
+      # sources for the *target* arch through cc-rs, which means
+      # aarch64-linux needs a cross-compiling gcc on the runner. The
+      # ubuntu-latest image doesn't carry one by default.
+      - name: Install aarch64-linux cross-toolchain
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Build
+        env:
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: cargo build --release --target ${{ matrix.target }}
       - name: Stage artifact
         shell: bash
         run: |
