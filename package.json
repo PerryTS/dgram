@@ -1,6 +1,6 @@
 {
   "name": "@perryts/dgram",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "UDP datagram socket bindings (Node `dgram` module) for the Perry TypeScript-to-native compiler.",
   "license": "MIT",
   "repository": {
