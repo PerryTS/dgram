@@ -1,8 +1,19 @@
 name: Release
 
-# Build prebuilt staticlibs for every supported target on tag, attach to the
-# GitHub release. The npm package can either vendor these (simpler) or pull
-# them via `postinstall` (smaller tarball).
+# One-shot release pipeline triggered by `vX.Y.Z` tag pushes:
+#
+#   1. `build` (matrix) — produces a per-target staticlib for every
+#      supported triple (macOS x64+arm64, Linux x64+arm64, Windows x64).
+#   2. `release` — creates the GitHub release and attaches every
+#      target's archive with a unique per-target name.
+#   3. `publish` — `npm publish --provenance --access public`.
+#
+# Why one workflow instead of two: events created via the workflow's
+# default GITHUB_TOKEN don't fire downstream workflows (GH's safety
+# rule against runaway recursion), so a separate `publish.yml` keyed
+# on `release: published` would never fire when `release.yml` creates
+# the release itself. Bundling everything into one workflow sidesteps
+# the cascade-blocking entirely.
 
 on:
   push:
@@ -14,10 +25,7 @@ jobs:
   build:
     name: ${{ matrix.target }}
     strategy:
-      # One target's failure shouldn't cancel the others — without this,
-      # a missing aarch64 cross-toolchain on ubuntu-latest cascades into
-      # cancellation of the macOS + Windows legs that would otherwise
-      # succeed.
+      # One target's failure shouldn't cancel the others.
       fail-fast: false
       matrix:
         include:
@@ -39,8 +47,7 @@ jobs:
           targets: ${{ matrix.target }}
       # mimalloc-sys (transitive via perry-runtime) compiles its C
       # sources for the *target* arch through cc-rs, which means
-      # aarch64-linux needs a cross-compiling gcc on the runner. The
-      # ubuntu-latest image doesn't carry one by default.
+      # aarch64-linux needs a cross-compiling gcc on the runner.
       - name: Install aarch64-linux cross-toolchain
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
@@ -52,19 +59,17 @@ jobs:
       - name: Stage artifact
         shell: bash
         run: |
-          # nullglob: empty globs expand to nothing instead of leaving the
-          # literal pattern, so the `*.lib` pattern is harmless on macOS /
-          # Linux (and `*.a` on Windows). Without it, the loop would hit
-          # an `[ -f literal-pattern ]` that fails under `set -e`.
+          # nullglob: empty globs expand to nothing instead of leaving
+          # the literal pattern (`set -e` would otherwise trip on the
+          # idle-glob iteration of the `*.lib` pattern on Linux/macOS).
           shopt -s nullglob
           mkdir -p artifact/${{ matrix.target }}
-          # Rename to embed the target triple — without this, every
-          # leg's `libperry_ext_dgram.a` collides on the release, and
-          # softprops' overwrite-by-default leaves only one .a in the
-          # uploaded asset list.
+          # Embed the target triple in the filename so all 5 archives
+          # land on the release without colliding (action-gh-release's
+          # default overwrite-by-name would otherwise leave only the
+          # last-uploaded `.a`).
           for f in target/${{ matrix.target }}/release/*.a target/${{ matrix.target }}/release/*.lib; do
             base="$(basename "$f")"
-            # libfoo.a → libfoo-<target>.a; foo.lib → foo-<target>.lib
             stem="${base%.*}"
             ext="${base##*.}"
             cp "$f" "artifact/${{ matrix.target }}/${stem}-${{ matrix.target }}.${ext}"
@@ -74,12 +79,11 @@ jobs:
           name: prebuilt-${{ matrix.target }}
           path: artifact/${{ matrix.target }}/
 
-  publish:
+  release:
     needs: build
     runs-on: ubuntu-latest
-    # softprops/action-gh-release needs `contents: write` to create the
-    # release (or attach files to an existing one). The default
-    # GITHUB_TOKEN scope on `push: tags` is read-only.
+    # softprops/action-gh-release needs `contents: write` to create
+    # the release (the default GITHUB_TOKEN scope on tag-push is r-o).
     permissions:
       contents: write
     steps:
@@ -91,3 +95,26 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: prebuilt/**
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    # `id-token: write` is required for `npm publish --provenance`.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Release tag ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+      - run: npm publish --provenance --access public
