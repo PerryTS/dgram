@@ -18,9 +18,9 @@ This package contains:
 ## Install
 
 ```sh
-bun add github:PerryTS/dgram
+bun add @perryts/dgram
 # or
-npm install github:PerryTS/dgram
+npm install @perryts/dgram
 ```
 
 The package's `package.json` declares a `perry.nativeLibrary` block (see the [manifest spec](https://github.com/PerryTS/perry/blob/main/docs/src/native-libraries/manifest-v1.md)) which Perry's compiler reads at link time to discover the staticlib + `extern "C"` symbols. No post-install build step — Perry compiles the Rust crate as part of your project's build.

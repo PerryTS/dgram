@@ -134,3 +134,7 @@ declare module "dgram" {
     interfaceAddress?: string,
   ): boolean;
 }
+
+declare module "@perryts/dgram" {
+  export * from "dgram";
+}
