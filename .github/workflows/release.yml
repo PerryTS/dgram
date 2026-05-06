@@ -70,6 +70,11 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    # softprops/action-gh-release needs `contents: write` to create the
+    # release (or attach files to an existing one). The default
+    # GITHUB_TOKEN scope on `push: tags` is read-only.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
