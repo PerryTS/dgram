@@ -52,10 +52,15 @@ jobs:
       - name: Stage artifact
         shell: bash
         run: |
+          # nullglob: empty globs expand to nothing instead of leaving the
+          # literal pattern, so the `*.lib` pattern is harmless on macOS /
+          # Linux (and `*.a` on Windows). Without it, the loop would hit
+          # an `[ -f literal-pattern ]` that fails under `set -e`.
+          shopt -s nullglob
           mkdir -p artifact/${{ matrix.target }}
           # macOS / Linux pattern: lib<name>.a; Windows pattern: <name>.lib
           for f in target/${{ matrix.target }}/release/*.a target/${{ matrix.target }}/release/*.lib; do
-            [ -f "$f" ] && cp "$f" artifact/${{ matrix.target }}/
+            cp "$f" artifact/${{ matrix.target }}/
           done
       - uses: actions/upload-artifact@v4
         with:
